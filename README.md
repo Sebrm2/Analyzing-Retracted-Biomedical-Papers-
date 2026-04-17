@@ -6,4 +6,4 @@
 
 #The Retraction Watch Database [Internet]. New York: The Center for Scientific Integrity. 2018. ISSN: 2692-4579. Available from: #http://retractiondatabase.org/.
 
-#SCImago, (n.d.). SJR — SCImago Journal & Country Rank [Portal], from http://www.scimagojr.com
+#SCImago,. SJR — SCImago Journal & Country Rank [Portal], from http://www.scimagojr.com
