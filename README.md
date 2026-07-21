@@ -1,15 +1,16 @@
 # Analyzing Retracted Biomedical Papers
 
 A reproducible analysis pipeline characterising retracted publications across four
-quantitative, data- and image-intensive biomedical research areas — **Neuroscience,
-Biostatistics/Epidemiology, Radiology/Imaging, and Nanotechnology** — using the
-[Retraction Watch Database](http://retractiondatabase.org/).
+quantitative, data- and image-intensive biomedical research areas (**Neuroscience,
+Biostatistics/Epidemiology, Radiology/Imaging, and Nanotechnology**) using the
+[Retraction Watch Database](https://retractionwatch.com/).
 
 The pipeline quantifies temporal trends, retraction reasons, geographic distribution,
 journal and author patterns, time-to-retraction, and the relationship between a paper's
 citation profile and how quickly it is retracted.
 
 These [slides](https://drive.google.com/file/d/1UQXqiqxkpiCgJHuqBpFmS-b6Sf3-tRHw/view?usp=sharing) show a lot of the figures I obtain with this code with the data not uploaded to this repository.
+
 ---
 
 ## Overview
