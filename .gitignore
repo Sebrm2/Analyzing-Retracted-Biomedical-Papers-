@@ -1,0 +1,28 @@
+# Data — do not commit the raw Retraction Watch database or generated caches
+data/retraction_watch.csv
+data/scimagojr-country.csv
+data/scimago_subject_totals.csv
+data/*.parquet
+retracted_titles.csv
+
+# Generated outputs (uncomment to keep them out of the repo)
+figures/*.pdf
+# figures/*.png
+figures/*.html
+tables/*.csv
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+*Zone.Identifier
