@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Biomedical Retraction Record</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --ink:#1a1a17; --ink-soft:#4a4842; --ink-faint:#84817a;
+    --paper:#f3efe6; --paper-2:#e9e4d7; --card:#fbf9f3;
+    --line:#d6d0c1; --line-strong:#b9b2a0;
+    --accent:#8a2b2b; --accent-soft:#b5533f; --teal:#2a6b62; --gold:#a97b26; --blue:#3a5a78;
+    --radius:3px;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+    --sans:'Inter',system-ui,sans-serif;
+    --display:'Fraunces',Georgia,serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  ::selection{background:var(--accent);color:#fff}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 28px}
+
+  header.mast{border-bottom:2px solid var(--ink);padding:38px 0 26px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--accent);font-weight:700;display:flex;align-items:center;gap:12px}
+  .eyebrow::after{content:"";flex:1;height:1px;background:var(--line-strong)}
+  h1.title{font-family:var(--display);font-weight:600;font-size:clamp(34px,6vw,64px);line-height:1.02;letter-spacing:-.02em;margin:16px 0 14px;max-width:15ch}
+  h1.title em{font-style:italic;color:var(--accent)}
+  .standfirst{font-size:18px;color:var(--ink-soft);max-width:60ch;line-height:1.55}
+
+  .intake{margin:34px 0 10px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius)}
+  .intake-inner{display:grid;grid-template-columns:1.3fr 1fr}
+  @media(max-width:760px){.intake-inner{grid-template-columns:1fr}}
+  .intake-copy{padding:30px 32px;border-right:1px solid var(--line)}
+  @media(max-width:760px){.intake-copy{border-right:none;border-bottom:1px solid var(--line)}}
+  .intake-copy h2{font-family:var(--display);font-weight:600;font-size:23px;letter-spacing:-.01em;margin-bottom:10px}
+  .intake-copy p{font-size:14.5px;color:var(--ink-soft);margin-bottom:14px}
+  .intake-copy a{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-soft)}
+  .steps{list-style:none;font-family:var(--mono);font-size:12px;color:var(--ink-faint);letter-spacing:.03em}
+  .steps li{padding:3px 0;display:flex;gap:10px}
+  .steps li b{color:var(--accent);font-weight:700}
+
+  .dropzone{padding:32px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;cursor:pointer;transition:background .18s;min-height:230px}
+  .dropzone:hover,.dropzone.drag{background:var(--paper-2)}
+  .drop-mark{width:52px;height:52px;border:2px solid var(--ink);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:26px;font-weight:600}
+  .dropzone h3{font-family:var(--sans);font-weight:600;font-size:16px}
+  .dropzone p{font-size:13px;color:var(--ink-faint)}
+  .btn{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;background:var(--ink);color:var(--paper);border:none;border-radius:var(--radius);padding:11px 20px;cursor:pointer;transition:background .15s}
+  .btn:hover{background:var(--accent)}
+  input[type=file]{display:none}
+  .status{font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:var(--ink-faint);min-height:18px;margin-top:4px}
+  .status.err{color:var(--accent)}
+  .status.ok{color:var(--teal)}
+
+  .controls{display:none;gap:14px;flex-wrap:wrap;align-items:flex-end;margin:30px 0 8px;padding:18px 20px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius)}
+  .controls.on{display:flex}
+  .ctrl label{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:5px;font-weight:700}
+  .ctrl select,.ctrl input{font-family:var(--sans);font-size:14px;color:var(--ink);background:var(--paper);border:1px solid var(--line-strong);border-radius:var(--radius);padding:8px 10px;min-width:180px}
+  .ctrl.grow{flex:1;min-width:200px}
+  .ctrl.grow input{width:100%}
+
+  main{padding:10px 0 80px;display:none}
+  main.on{display:block}
+  .section{margin-top:52px}
+  .sec-head{display:flex;align-items:baseline;gap:14px;border-bottom:1px solid var(--line-strong);padding-bottom:10px;margin-bottom:22px}
+  .sec-num{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);letter-spacing:.1em}
+  .sec-head h2{font-family:var(--display);font-weight:600;font-size:26px;letter-spacing:-.01em}
+  .sec-head p{margin-left:auto;font-size:13px;color:var(--ink-faint);max-width:40ch;text-align:right}
+  @media(max-width:680px){.sec-head p{display:none}}
+
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  @media(max-width:820px){.kpis{grid-template-columns:repeat(2,1fr)}}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px;position:relative;overflow:hidden}
+  .kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+  .kpi .val{font-family:var(--display);font-weight:600;font-size:38px;line-height:1;letter-spacing:-.02em}
+  .kpi .lab{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin-top:9px;font-weight:700}
+  .kpi .sub{font-size:12.5px;color:var(--ink-soft);margin-top:6px}
+
+  .grid{display:grid;gap:20px}
+  .grid.two{grid-template-columns:1fr 1fr}
+  @media(max-width:820px){.grid.two{grid-template-columns:1fr}}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px}
+  .panel h3{font-family:var(--sans);font-weight:600;font-size:15px;margin-bottom:3px}
+  .panel .cap{font-size:12.5px;color:var(--ink-faint);margin-bottom:16px;line-height:1.45}
+  .chart-holder{position:relative;height:300px}
+  .chart-holder.tall{height:440px}
+
+  .note{font-size:12.5px;color:var(--ink-faint);margin-top:14px;padding-left:14px;border-left:2px solid var(--line-strong)}
+
+  .finding-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin-top:4px}
+  @media(max-width:600px){.finding-grid{grid-template-columns:1fr}}
+  .finding-cell{padding:26px 28px;background:var(--paper)}
+  .finding-cell.accent{background:#f4e8e4;border-left:1px solid var(--line)}
+  @media(max-width:600px){.finding-cell.accent{border-left:none;border-top:1px solid var(--line)}}
+  .finding-label{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--ink-soft)}
+  .finding-cond{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);margin-top:5px}
+  .finding-val{font-family:var(--display);font-weight:600;font-size:52px;line-height:1;letter-spacing:-.02em;margin-top:16px;color:var(--ink)}
+  .finding-cell.accent .finding-val{color:var(--accent)}
+  .finding-val span{font-size:22px;font-weight:500}
+  .finding-sub{font-size:12.5px;color:var(--ink-soft);margin-top:8px}
+
+  footer{border-top:2px solid var(--ink);padding:30px 0 60px;margin-top:70px}
+  footer .footer-top{display:flex;flex-wrap:wrap;gap:20px;justify-content:space-between;align-items:center}
+  footer p{font-size:12.5px;color:var(--ink-faint);font-family:var(--mono);letter-spacing:.03em}
+  footer a{color:var(--accent);text-decoration:none}
+  footer .cite{margin-top:22px;padding-top:18px;border-top:1px solid var(--line);font-family:var(--sans);font-size:12.5px;line-height:1.5;color:var(--ink-soft);letter-spacing:0;max-width:92ch}
+  footer .cite a{border-bottom:1px solid var(--accent-soft)}
+</style>
+</head>
+<body>
+
+<header class="mast">
+  <div class="wrap">
+    <div class="eyebrow">Sebastian Rodriguez</div>
+    <h1 class="title">The biomedical <em>retraction</em> record</h1>
+    <p class="standfirst">This dashboard uses the Retraction Watch database and describes the retracted biomedical papers it contains. How many were retracted, why, where the work came from, and how long each paper was published before it was retracted.</p>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section class="intake" id="intake">
+    <div class="intake-inner">
+      <div class="intake-copy">
+        <h2>Load the data</h2>
+        <p>The dashboard works from the Retraction Watch database export, which is a single CSV file. You can download the current version from <a href="https://gitlab.com/crossref/retraction-watch-data" target="_blank" rel="noopener">Crossref's Retraction Watch data repository on GitLab</a> and then load the file below.</p>
+        <ul class="steps">
+          <li><b>1</b> Download <span style="font-family:var(--mono)">retraction_watch.csv</span></li>
+          <li><b>2</b> Drop it into the panel on the right</li>
+          <li><b>3</b> The figures update from the file</li>
+        </ul>
+      </div>
+      <label class="dropzone" id="dropzone" for="fileInput">
+        <div class="drop-mark">&darr;</div>
+        <h3>Drop the CSV here</h3>
+        <p>or click to choose a file</p>
+        <span class="btn">Select CSV</span>
+        <input type="file" id="fileInput" accept=".csv,text/csv">
+        <div class="status" id="status"></div>
+      </label>
+    </div>
+  </section>
+
+  <div class="controls" id="controls">
+    <div class="ctrl">
+      <label for="fSubject">Subject focus</label>
+      <select id="fSubject"></select>
+    </div>
+    <div class="ctrl grow">
+      <label for="fSearch">Filter by journal, country, or reason</label>
+      <input id="fSearch" type="text" placeholder="e.g. Hindawi, China, Paper Mill">
+    </div>
+    <button class="btn" id="resetBtn">Reset</button>
+  </div>
+
+</div>
+
+<main id="dash">
+  <div class="wrap">
+
+    <section class="section" id="s-overview">
+      <div class="sec-head"><span class="sec-num">01</span><h2>At a glance</h2><p>Headline counts for the current selection.</p></div>
+      <div class="kpis" id="kpis"></div>
+    </section>
+
+    <section class="section">
+      <div class="sec-head"><span class="sec-num">02</span><h2>Retraction over time</h2><p>How many papers were retracted each year, and how long they lasted first.</p></div>
+      <div class="grid two">
+        <div class="panel">
+          <h3>Retractions per year</h3>
+          <p class="cap">Number of retracted papers per year in the current selection.</p>
+          <div class="chart-holder"><canvas id="cAnnual"></canvas></div>
+        </div>
+        <div class="panel">
+          <h3>Time to retraction</h3>
+          <p class="cap">Years between publication and retraction. The long tail is papers that stood for a decade or more before being pulled.</p>
+          <div class="chart-holder"><canvas id="cTTR"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="sec-head"><span class="sec-num">03</span><h2>Reasons for retraction</h2><p>The stated reasons, grouped into broader categories.</p></div>
+      <div class="panel">
+        <h3>Reasons by frequency</h3>
+        <p class="cap">A paper can list several reasons, so it is counted once in each category it touches.</p>
+        <div class="chart-holder tall"><canvas id="cReasons"></canvas></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="sec-head"><span class="sec-num">04</span><h2>Where the papers came from</h2><p>The countries and publishers behind the retracted papers.</p></div>
+      <div class="grid two">
+        <div class="panel">
+          <h3>Top countries</h3>
+          <p class="cap">By author affiliation. A paper listing several countries counts once for each.</p>
+          <div class="chart-holder tall"><canvas id="cCountries"></canvas></div>
+        </div>
+        <div class="panel">
+          <h3>Top publishers</h3>
+          <p class="cap">The publishers with the most retracted papers in the selection.</p>
+          <div class="chart-holder tall"><canvas id="cPublishers"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="sec-head"><span class="sec-num">05</span><h2>Authorship and speed</h2><p>How the number of authors relates to how quickly a paper is retracted.</p></div>
+      <div class="panel">
+        <h3>Retractions by number of authors</h3>
+        <p class="cap">Papers grouped by how many authors they list, with the median time to retraction for each group.</p>
+        <div class="chart-holder"><canvas id="cAuthors"></canvas></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="sec-head"><span class="sec-num">06</span><h2>Time to retraction by country</h2><p>Which countries correct the record fastest, and which are slowest.</p></div>
+      <div class="panel">
+        <h3>Median time to retraction by country</h3>
+        <p class="cap">Fastest and slowest countries, among those with enough dated papers in the selection.</p>
+        <div class="chart-holder tall"><canvas id="cLag"></canvas></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="sec-head"><span class="sec-num">07</span><h2>Prominence and speed</h2><p>Whether well-cited papers take longer to retract.</p></div>
+      <div class="panel finding">
+        <h3>More-cited papers stay in the record longer</h3>
+        <p class="cap">From the citation-enriched dataset (computed separately in the analysis pipeline), papers were split at the median citation count. Well-cited papers took about twice as long to retract.</p>
+        <div class="finding-grid">
+          <div class="finding-cell">
+            <div class="finding-label">Low citation papers</div>
+            <div class="finding-cond">5 citations or fewer &middot; n = 2,122</div>
+            <div class="finding-val">1.3 <span>yr</span></div>
+            <div class="finding-sub">median time to retraction</div>
+          </div>
+          <div class="finding-cell accent">
+            <div class="finding-label">High citation papers</div>
+            <div class="finding-cond">more than 5 citations &middot; n = 1,883</div>
+            <div class="finding-val">2.7 <span>yr</span></div>
+            <div class="finding-sub">median time to retraction</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="s-subject">
+      <div class="sec-head"><span class="sec-num">08</span><h2>By field</h2><p>How the four biomedical subject areas compare.</p></div>
+      <div class="panel">
+        <h3>Retractions and median time to retraction by subject</h3>
+        <p class="cap">Bars show the number of retracted papers; the marked points show the median years to retraction for each field.</p>
+        <div class="chart-holder"><canvas id="cSubjects"></canvas></div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<footer>
+  <div class="wrap footer-top">
+    <p>Built from the Retraction Watch Database</p>
+    <p><a href="https://github.com/" target="_blank" rel="noopener">View the analysis code on GitHub</a></p>
+  </div>
+  <div class="wrap">
+    <p class="cite">The Retraction Watch Database [Internet]. New York: The Center for Scientific Integrity. 2018. ISSN: 2692-4579. Available from: <a href="http://retractiondatabase.org/" target="_blank" rel="noopener">http://retractiondatabase.org/</a></p>
+  </div>
+</footer>
+
+<script>
+const C = {ink:'#1a1a17',accent:'#8a2b2b',accentSoft:'#b5533f',teal:'#2a6b62',gold:'#a97b26',blue:'#3a5a78',faint:'#84817a',line:'#d6d0c1'};
+const SERIES = ['#8a2b2b','#2a6b62','#a97b26','#3a5a78','#b5533f','#6d6875','#606c38','#9c6b3f','#4a7a86','#8d5b7a','#557153','#a8763e','#3f5b78'];
+
+Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+Chart.defaults.font.size = 12;
+Chart.defaults.color = '#4a4842';
+Chart.defaults.plugins.legend.display = false;
+Chart.defaults.plugins.tooltip.backgroundColor = '#1a1a17';
+Chart.defaults.plugins.tooltip.padding = 10;
+Chart.defaults.plugins.tooltip.cornerRadius = 3;
+Chart.defaults.plugins.tooltip.titleFont = {family:"'JetBrains Mono', monospace", size:11};
+Chart.defaults.plugins.tooltip.bodyFont = {family:"'Inter', sans-serif", size:13};
+
+const REASON_CATEGORIES = {
+  "Data and Results Issues":["unreliable results","unreliable results and/or conclusions","concerns/issues about data","error in data","original data not provided","unreliable data","error in results and/or conclusions","error in analyses","error in methods","results not reproducible","concerns/issues about results","concerns/issues about results and/or conclusions","concerns/issues about article","concerns/issues about methods","error in text","error in materials (general)","error in materials","error in cell lines/tissues","contamination of cell lines/tissues","contamination of materials (general)","contamination of materials","contamination of reagents","manipulation of results","manipulation of data","unreliable image","error in image","sabotage of materials/methods"],
+  "Computer-Generated Content and AI":["computer-aided content or computer-generated content"],
+  "Authorship and Ethical Concerns":["concerns/issues about authorship","concerns/issues about animal welfare","concerns/issues about human subject welfare","concerns/issues about authorship/affiliation","misconduct by author","ethical violations by author","ethical violations by company/institution/third party","false/forged authorship","false/forged affiliation","conflict of interest","lack of approval from author","lack of approval from company/institution","lack of approval from third party","lack of irb/iacuc approval and/or compliance","informed/patient consent - none/withdrawn","author unresponsive","false affiliation"],
+  "Plagiarism and Duplication":["duplication of image","duplication of article","duplication of data","duplication of text","plagiarism of article","euphemisms for plagiarism","plagiarism of text","plagiarism of image","plagiarism of data","euphemisms for duplication","duplication of/in article","duplication of/in image","plagiarism of/in article"],
+  "Image Manipulation and Fabrication":["manipulation of images","concerns/issues about image","falsification/fabrication of image"],
+  "Investigations and Findings":["investigation by journal/publisher","investigation by company/institution","investigation by third party","investigation by ori","misconduct - official investigation/finding","investigation by office of research integrity"],
+  "Peer Review and Editorial Issues":["fake peer review","rogue editor","concerns/issues with peer review","taken via peer review","compromised peer review","concerns/issues about peer review"],
+  "Misconduct and Fraud":["paper mill","falsification/fabrication of data","falsification/fabrication of results","misconduct by third party","misconduct by company/institution","euphemisms for misconduct","randomly generated content","ethical violations by third party","misconduct - official investigation(s) and/or finding(s)"],
+  "Procedural and Legal Issues":["legal reasons/legal threats","legal reasons and/or threats","criminal proceedings","civil proceedings","nonpayment of fees/refusal to pay","publishing ban"],
+  "Withdrawal and Retraction Notices":["withdrawal","retract and replace","temporary removal","date of retraction/other unknown","notice - limited or no information","notice - lack of","notice - unable to access via current resources","upgrade/update of prior notice","updated to retraction","notice - no/limited information","updated to expression of concern","upgrade/update of prior notice(s)"],
+  "Complaints and Objections":["objections by third party","objections by author(s)","objections by company/institution","complaints about author","complaints about third party","complaints about company/institution"],
+  "Institutional and Policy Issues":["breach of policy by author","lack of irb/iacuc approval","concerns/issues about third party involvement","concerns/issues about referencing/attributions","cites retracted work"],
+  "Miscellaneous":["copyright claims","transfer of copyright and/or ownership","error by journal/publisher","error by third party","salami slicing","hoax paper","no further action","removed","updated to correction"]
+};
+const REASON_LOOKUP = {};
+for (const [cat, members] of Object.entries(REASON_CATEGORIES))
+  for (const m of members) REASON_LOOKUP[m] = cat;
+
+function mapReasons(raw){
+  if(!raw) return ["Other / unknown"];
+  const cats = new Set();
+  for(let tok of String(raw).split(";")){ tok=tok.trim().toLowerCase(); if(!tok) continue; cats.add(REASON_LOOKUP[tok] || "Other / unknown"); }
+  return cats.size ? [...cats] : ["Other / unknown"];
+}
+
+const SUBJECT_SCOPE = {
+  "(bls) neuroscience":"Neuroscience",
+  "(hsc) biostatistics/epidemiology":"Biostatistics/Epidemiology",
+  "(hsc) radiology/imaging":"Radiology/Imaging",
+  "(phy) nanotechnology":"Nanotechnology"
+};
+const SUBJECT_ORDER = ["Neuroscience","Biostatistics/Epidemiology","Radiology/Imaging","Nanotechnology"];
+const CITATION_FIELDS = ["citation_count","CitationCount","Citations","cited_by_count","TimesCited"];
+
+let RAW = [], VIEW = [];
+const charts = {};
+
+function parseDate(s){ if(!s) return null; const d=new Date(s); return isNaN(d)?null:d; }
+function yearOf(d){ return d?d.getFullYear():null; }
+
+function prepRow(r, citField){
+  const pub = parseDate(r.OriginalPaperDate);
+  const ret = parseDate(r.RetractionDate);
+  let ttr = null;
+  if(pub && ret){ ttr = (ret - pub)/(1000*60*60*24*365.25); }
+  let subject = null;
+  const subjRaw = (r.Subject||"").toLowerCase();
+  for(const [tag,name] of Object.entries(SUBJECT_SCOPE)){ if(subjRaw.includes(tag)){ subject = name; break; } }
+  let authorCount = 0;
+  if(r.Author){ authorCount = String(r.Author).split(";").map(s=>s.trim()).filter(Boolean).length; }
+  let cit = null;
+  if(citField && r[citField]!=null && r[citField]!==""){ const v=Number(r[citField]); if(!isNaN(v)) cit=v; }
+  return {
+    nature:(r.RetractionNature||"").trim(),
+    journal:(r.Journal||"").trim(),
+    publisher:(r.Publisher||"").trim(),
+    countries:(r.Country||"").split(";").map(s=>s.trim()).filter(Boolean),
+    reasons:mapReasons(r.Reason),
+    reasonRaw:(r.Reason||"").toLowerCase(),
+    pubYear:yearOf(pub), retYear:yearOf(ret),
+    ttr:(ttr!=null && ttr>=0 && ttr<=30)?ttr:null,
+    authorCount:authorCount||null, citation:cit,
+    subject:subject, _subjRaw:subjRaw
+  };
+}
+
+const statusEl = document.getElementById('status');
+function setStatus(msg, cls=''){ statusEl.textContent = msg; statusEl.className = 'status '+cls; }
+
+function handleFile(file){
+  if(!file) return;
+  if(!/\.csv$/i.test(file.name)){ setStatus('That file is not a CSV.', 'err'); return; }
+  setStatus('Reading '+file.name);
+  Papa.parse(file,{
+    header:true, skipEmptyLines:true,
+    complete:(res)=>{
+      try{
+        const rows = res.data.filter(r=>r.RetractionNature!==undefined);
+        if(!rows.length){ setStatus('No rows found. Check that this is the Retraction Watch export.', 'err'); return; }
+        const fields = res.meta.fields || [];
+        const citField = CITATION_FIELDS.find(f=>fields.includes(f)) || null;
+        RAW = rows.map(r=>prepRow(r, citField)).filter(r=>r.nature==='Retraction');
+        setStatus('Loaded '+RAW.length.toLocaleString()+' retracted papers.', 'ok');
+        buildSubjectFilter();
+        document.getElementById('controls').classList.add('on');
+        document.getElementById('dash').classList.add('on');
+        applyFilters();
+        document.getElementById('s-overview').scrollIntoView({behavior:'smooth',block:'start'});
+      }catch(e){ console.error(e); setStatus('Could not process the file: '+e.message, 'err'); }
+    },
+    error:(err)=>{ setStatus('Parse error: '+err.message, 'err'); }
+  });
+}
+
+const dz = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+fileInput.addEventListener('change', e=>handleFile(e.target.files[0]));
+['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag');}));
+['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag');}));
+dz.addEventListener('drop',e=>{ if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]); });
+
+function buildSubjectFilter(){
+  const sel = document.getElementById('fSubject');
+  const present = SUBJECT_ORDER.filter(s=>RAW.some(r=>r.subject===s));
+  let opts = '<option value="__biomed">Biomedical papers</option>';
+  opts += present.map(s=>`<option value="${s}">${s}</option>`).join('');
+  opts += '<option value="__all">All papers</option>';
+  sel.innerHTML = opts;
+}
+
+['fSubject','fSearch'].forEach(id=>document.getElementById(id).addEventListener('input', applyFilters));
+document.getElementById('resetBtn').addEventListener('click',()=>{
+  document.getElementById('fSubject').value='__biomed';
+  document.getElementById('fSearch').value='';
+  applyFilters();
+});
+
+function applyFilters(){
+  const subj = document.getElementById('fSubject').value;
+  const q = document.getElementById('fSearch').value.trim().toLowerCase();
+  VIEW = RAW.filter(r=>{
+    if(subj==="__biomed" && !r.subject) return false;
+    if(subj!=="__biomed" && subj!=="__all" && r.subject!==subj) return false;
+    if(q){
+      const hay = (r.journal+' '+r.publisher+' '+r.countries.join(' ')+' '+r.reasonRaw+' '+r._subjRaw).toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  render();
+}
+
+function countBy(rows, keyFn){
+  const m = new Map();
+  for(const r of rows){ for(const k of [].concat(keyFn(r))){ if(k==null||k==="") continue; m.set(k,(m.get(k)||0)+1); } }
+  return m;
+}
+function topN(map, n){ return [...map.entries()].sort((a,b)=>b[1]-a[1]).slice(0,n); }
+function median(arr){ if(!arr.length) return null; const s=[...arr].sort((a,b)=>a-b); const m=Math.floor(s.length/2); return s.length%2?s[m]:(s[m-1]+s[m])/2; }
+function mkChart(id, cfg){ if(charts[id]) charts[id].destroy(); const el=document.getElementById(id); if(!el) return; charts[id]=new Chart(el,cfg); }
+
+function render(){
+  renderKPIs(); renderAnnual(); renderTTR(); renderReasons();
+  renderCountries(); renderPublishers();
+  renderAuthors(); renderLag(); renderSubjects();
+}
+
+function renderKPIs(){
+  const n = VIEW.length;
+  const ttrs = VIEW.map(r=>r.ttr).filter(v=>v!=null);
+  const medTTR = median(ttrs);
+  const journals = new Set(VIEW.map(r=>r.journal).filter(Boolean)).size;
+  const countries = new Set(VIEW.flatMap(r=>r.countries)).size;
+  const kpis = [
+    {val:n.toLocaleString(), lab:'Retracted papers', sub:'in current selection'},
+    {val:medTTR!=null?medTTR.toFixed(1)+' yr':'n/a', lab:'Median time to retraction', sub:ttrs.length?ttrs.length.toLocaleString()+' with dates':'no dated papers'},
+    {val:journals.toLocaleString(), lab:'Journals', sub:'represented'},
+    {val:countries.toLocaleString(), lab:'Countries', sub:'by author affiliation'}
+  ];
+  document.getElementById('kpis').innerHTML = kpis.map(k=>
+    `<div class="kpi"><div class="val">${k.val}</div><div class="lab">${k.lab}</div><div class="sub">${k.sub}</div></div>`
+  ).join('');
+}
+
+function renderAnnual(){
+  const m = countBy(VIEW.filter(r=>r.retYear&&r.retYear>=1980&&r.retYear<=2026), r=>r.retYear);
+  const years=[...m.keys()].sort((a,b)=>a-b);
+  mkChart('cAnnual',{type:'line',data:{labels:years,datasets:[{
+    data:years.map(y=>m.get(y)), borderColor:C.accent, backgroundColor:'rgba(138,43,43,0.08)',
+    fill:true, tension:.25, pointRadius:2, pointHoverRadius:5, borderWidth:2
+  }]},options:baseOpts('Year','Retracted papers')});
+}
+
+function renderTTR(){
+  const vals = VIEW.map(r=>r.ttr).filter(v=>v!=null);
+  const bins = new Array(30).fill(0);
+  vals.forEach(v=>{ const b=Math.min(29,Math.floor(v)); bins[b]++; });
+  const med = median(vals);
+  mkChart('cTTR',{type:'bar',data:{labels:bins.map((_,i)=>i),datasets:[{
+    data:bins, backgroundColor:C.teal, borderRadius:1, barPercentage:.98, categoryPercentage:.98
+  }]},options:{...baseOpts('Years to retraction','Papers'),
+    plugins:{tooltip:{callbacks:{title:(t)=>t[0].label+' to '+(+t[0].label+1)+' yr'}},
+    subtitle:med!=null?{display:true,text:'Median '+med.toFixed(1)+' yr',color:C.accent,font:{family:"'JetBrains Mono',monospace",size:11},position:'top',align:'end'}:{display:false}}
+  }});
+}
+
+function renderReasons(){
+  const items = [...countBy(VIEW, r=>r.reasons).entries()].sort((a,b)=>b[1]-a[1]);
+  mkChart('cReasons',{type:'bar',data:{labels:items.map(i=>i[0]),datasets:[{
+    data:items.map(i=>i[1]), backgroundColor:items.map((_,i)=>SERIES[i%SERIES.length]), borderRadius:2
+  }]},options:hbarOpts()});
+}
+
+function renderCountries(){
+  const items = topN(countBy(VIEW, r=>r.countries),15);
+  mkChart('cCountries',{type:'bar',data:{labels:items.map(i=>i[0]),datasets:[{
+    data:items.map(i=>i[1]), backgroundColor:C.blue, borderRadius:2
+  }]},options:hbarOpts()});
+}
+
+function renderPublishers(){
+  const items = topN(countBy(VIEW, r=>r.publisher),12);
+  mkChart('cPublishers',{type:'bar',data:{labels:items.map(i=>i[0]),datasets:[{
+    data:items.map(i=>i[1]), backgroundColor:C.gold, borderRadius:2
+  }]},options:hbarOpts()});
+}
+
+function renderAuthors(){
+  const rows = VIEW.filter(r=>r.authorCount!=null && r.authorCount<=20);
+  const groups = [
+    {lab:'1',lo:1,hi:1},{lab:'2',lo:2,hi:2},{lab:'3',lo:3,hi:3},{lab:'4',lo:4,hi:4},
+    {lab:'5',lo:5,hi:5},{lab:'6-7',lo:6,hi:7},{lab:'8-10',lo:8,hi:10},
+    {lab:'11-15',lo:11,hi:15},{lab:'16-20',lo:16,hi:20}
+  ];
+  const counts=[], meds=[];
+  groups.forEach(g=>{
+    const sub = rows.filter(r=>r.authorCount>=g.lo && r.authorCount<=g.hi);
+    counts.push(sub.length);
+    meds.push(median(sub.map(r=>r.ttr).filter(v=>v!=null)));
+  });
+  mkChart('cAuthors',{data:{labels:groups.map(g=>g.lab),datasets:[
+    {type:'bar',label:'Retractions',data:counts,backgroundColor:C.blue,borderRadius:2,yAxisID:'y',order:2},
+    {type:'line',label:'Median TTR (yr)',data:meds,borderColor:C.accent,backgroundColor:C.accent,pointRadius:4,pointHoverRadius:6,borderWidth:2,yAxisID:'y1',order:1,spanGaps:true}
+  ]},options:dualOpts('Authors','Retractions','Median years')});
+}
+
+
+function renderLag(){
+  // Match the Python pipeline: use each paper's PRIMARY country (first listed),
+  // require at least 30 dated papers per country, and show the fastest 15 and
+  // slowest 15 by median time to retraction.
+  const byCountry = new Map();
+  for(const r of VIEW){
+    if(r.ttr==null || !r.countries.length) continue;
+    const primary = r.countries[0];
+    if(!byCountry.has(primary)) byCountry.set(primary, []);
+    byCountry.get(primary).push(r.ttr);
+  }
+  let rows=[];
+  for(const [c,vals] of byCountry){ if(vals.length>=30) rows.push({c,med:median(vals),n:vals.length}); }
+  rows.sort((a,b)=>a.med-b.med);
+  if(rows.length>30){ rows=[...rows.slice(0,15),...rows.slice(-15)]; }
+  const overall = median(VIEW.map(r=>r.ttr).filter(v=>v!=null)) || 0;
+  mkChart('cLag',{type:'bar',data:{labels:rows.map(r=>r.c),datasets:[{
+    data:rows.map(r=>r.med), backgroundColor:rows.map(r=>r.med<=overall?C.teal:C.accent), borderRadius:2
+  }]},options:{...hbarOpts(),
+    scales:{x:{beginAtZero:true,grid:{color:'rgba(0,0,0,.05)'},title:{display:true,text:'Median time to retraction (years)',font:{size:11}}},y:{grid:{display:false},ticks:{font:{size:11}}}},
+    plugins:{tooltip:{callbacks:{
+    label:(ctx)=>' median '+ctx.parsed.x.toFixed(1)+' yr  (n='+rows[ctx.dataIndex].n+')'
+  }}}}});
+}
+
+function renderSubjects(){
+  const q = document.getElementById('fSearch').value.trim().toLowerCase();
+  const base = RAW.filter(r=>{
+    if(!r.subject) return false;
+    if(q){ const hay=(r.journal+' '+r.publisher+' '+r.countries.join(' ')+' '+r.reasonRaw).toLowerCase(); if(!hay.includes(q)) return false; }
+    return true;
+  });
+  const subjects = SUBJECT_ORDER.filter(s=>base.some(r=>r.subject===s));
+  const counts = subjects.map(s=>base.filter(r=>r.subject===s).length);
+  const meds = subjects.map(s=>median(base.filter(r=>r.subject===s).map(r=>r.ttr).filter(v=>v!=null)));
+  mkChart('cSubjects',{data:{labels:subjects,datasets:[
+    {type:'bar',label:'Retractions',data:counts,backgroundColor:C.accent,borderRadius:2,yAxisID:'y',order:2},
+    {type:'line',label:'Median TTR (yr)',data:meds,borderColor:C.teal,backgroundColor:C.teal,pointRadius:5,pointHoverRadius:7,borderWidth:2,yAxisID:'y1',order:1,spanGaps:true}
+  ]},options:dualOpts('Field','Retractions','Median years')});
+}
+
+function baseOpts(xlab,ylab){
+  return {responsive:true,maintainAspectRatio:false,
+    scales:{x:{grid:{display:false},title:xlab?{display:true,text:xlab,font:{size:11}}:{}},
+            y:{beginAtZero:true,grid:{color:'rgba(0,0,0,.05)'},title:ylab?{display:true,text:ylab,font:{size:11}}:{}}}};
+}
+function hbarOpts(){
+  return {indexAxis:'y',responsive:true,maintainAspectRatio:false,
+    scales:{x:{beginAtZero:true,grid:{color:'rgba(0,0,0,.05)'}},y:{grid:{display:false},ticks:{font:{size:11}}}}};
+}
+function dualOpts(xlab,yl,yr){
+  return {responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:true,position:'top',labels:{font:{family:"'JetBrains Mono',monospace",size:10},usePointStyle:true,boxWidth:8}}},
+    scales:{y:{position:'left',beginAtZero:true,title:{display:true,text:yl},grid:{color:'rgba(0,0,0,.05)'}},
+            y1:{position:'right',beginAtZero:true,title:{display:true,text:yr},grid:{drawOnChartArea:false}},
+            x:{grid:{display:false},title:{display:true,text:xlab}}}};
+}
+</script>
+</body>
+</html>
